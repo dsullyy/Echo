@@ -10,6 +10,7 @@ const faqs = require('./faqs.json');
 const natural = require('natural');
 const axios = require('axios');
 const channelIDs = [process.env.CHANNEL_ID1, process.env.CHANNEL_ID2];
+const commandsFile = './commands';
 
 let TfIdf = natural.TfIdf;
 let tfidf = new TfIdf();
