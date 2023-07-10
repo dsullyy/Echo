@@ -31,28 +31,27 @@ const client = new Client({
     ],
 });
 
-// Define the function to relay messages containing "SPY" or "SPX"
-function relayMessage(message) {
-  // Convert the message to lower case
-  let messageContentLower = message.content.toLowerCase();
-
-  // Check if the message is from the specific source channel
-  if (message.channel.id === process.env.CHANNEL_ID4 && message.author.id === process.env.SOURCE_USER_ID) {
-      // Check if the message contains "SPY" or "SPX"
-      if (messageContentLower.includes("spy") || messageContentLower.includes("spx")) {
-          // Get the target channel to relay the message to
-          let targetChannel = client.channels.cache.get(process.env.CHANNEL_ID3);
-
-          // If the channel exists, send the message to that channel
-          if (targetChannel) {
-              console.log('Relaying message to target channel...');
-              targetChannel.send(`${message.author.username} mentioned SPY or SPX: ${message.content}`);
-          } else {
-              console.log('Target channel not found.');
-          }
-      }
-  }
-}
+  function relayMessage(message) {
+    // Convert the message to lower case
+    let messageContentLower = message.content.toLowerCase();
+  
+    // Check if the message is from the specific source channels
+    if (message.channel.id === process.env.CHANNEL_ID4 && (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2)) {
+        // Check if the message contains "SPY" or "SPX"
+        if (messageContentLower.includes("spy") || messageContentLower.includes("spx")) {
+            // Get the target channel to relay the message to
+            let targetChannel = client.channels.cache.get(process.env.CHANNEL_ID3);
+  
+            // If the channel exists, send the message to that channel
+            if (targetChannel) {
+                console.log('Relaying message to target channel...');
+                targetChannel.send(message.content); // Change this line
+            } else {
+                console.log('Target channel not found.');
+            }
+        }
+    }
+  }  
 
 client.commands = new Discord.Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
