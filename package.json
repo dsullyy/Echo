@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@pinecone-database/pinecone": "^0.1.6",
     "axios": "^1.4.0",
     "bottleneck": "^2.19.5",
     "discord.js": "^14.11.0",

@@ -10,7 +10,11 @@ const faqs = require('./faqs.json');
 const natural = require('natural');
 const axios = require('axios');
 const channelIDs = [process.env.CHANNEL_ID1, process.env.CHANNEL_ID2];
+const botUsername = "Echo";
+const { getOriginalPrompt, getCustomPrompt } = require('./promptUtils');
 const commandsFile = './commands';
+const pinecone = require("@pinecone-database/pinecone");
+const vector = pinecone.vector;
 
 let TfIdf = natural.TfIdf;
 let tfidf = new TfIdf();
@@ -26,6 +30,26 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
     ],
 });
+
+// Define the function to relay messages containing "SPY" or "SPX"
+function relayMessage(message) {
+  // Check if the message is from the specific source channel
+  if (message.channel.id === process.env.CHANNEL_ID4 && message.author.id === process.env.SOURCE_USER_ID) {
+      // Check if the message contains "SPY" or "SPX"
+      if (messageContentLower.includes("spy") || messageContentLower.includes("spx")) {
+          // Get the target channel to relay the message to
+          let targetChannel = client.channels.cache.get(process.env.CHANNEL_ID3);
+
+          // If the channel exists, send the message to that channel
+          if (targetChannel) {
+              console.log('Relaying message to target channel...');
+              targetChannel.send(`${message.author.username} mentioned SPY or SPX: ${message.content}`);
+          } else {
+              console.log('Target channel not found.');
+          }
+      }
+  }
+}
 
 client.commands = new Discord.Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
@@ -44,6 +68,12 @@ const configuration = new Configuration({
 });
 
 const openai = new OpenAIApi(configuration);
+
+let Echo = "ChatGPT";
+let customPrompt = "You're a sage trading monk, steeped in the wisdom of a thousand years, having spent a millennium atop Mount Wudan";
+
+console.log(getOriginalPrompt(Echo));
+console.log(getCustomPrompt(Echo, customPrompt));
 
 // Creating a Bottleneck rate limiter
 const limiter = new Bottleneck({
@@ -85,7 +115,8 @@ client.on('messageCreate', async (message) => {
         return;
     }   
 
-    let conversationLog = [];
+     // Call the relayMessage function
+    relayMessage(message);
 
     try {
         await message.channel.sendTyping();
@@ -96,7 +127,10 @@ client.on('messageCreate', async (message) => {
 
         let conversationLog = conversationLogs.get(message.author.id);
         if (!conversationLog) {
-            conversationLog = [{ role: 'system', content: 'You are an AI assistant named Echo \uD83D\uDD3A. Your primary role is to assist users with their trading related questions. Your secondary role is to track option trade positions, trading decisions, and price targets mentioned by @luckeee. When users ask about these topics, provide the latest information that @luckeee has mentioned.\uD83D\uDD0D I am still in the beta development stage, so please be patient with me \uD83D\uDE05' }];
+            // Using getOriginalPrompt function
+            const botUsername = "Echo";
+            const initialPrompt = getOriginalPrompt(botUsername);
+            conversationLog = [{ role: 'system', content: initialPrompt }];
             conversationLogs.set(message.author.id, conversationLog);
         }
 
@@ -117,7 +151,7 @@ client.on('messageCreate', async (message) => {
         const result = await openai.createChatCompletion({
             model: 'gpt-3.5-turbo',
             messages: conversationLog,
-            max_tokens: 1000,
+            max_tokens: 800,
         });
 
         // Add this line to check if the message starts with 'Echo' or a slash command
@@ -183,7 +217,7 @@ client.on('messageCreate', async (message) => {
                         },
                       ],
                       temperature: 0.5,
-                      max_tokens: 1000,
+                      max_tokens: 800,
                     });
         
                     console.log(result);
@@ -224,7 +258,7 @@ client.on('messageCreate', async (message) => {
             const assistantResponse = await openai.createChatCompletion({
                 model: 'gpt-3.5-turbo',
                 messages: conversationLog,
-                max_tokens: 1000,
+                max_tokens: 800,
             });
             
             assistantMessage = assistantResponse.data.choices[0].message.content;
