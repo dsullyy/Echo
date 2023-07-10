@@ -33,6 +33,9 @@ const client = new Client({
 
 // Define the function to relay messages containing "SPY" or "SPX"
 function relayMessage(message) {
+  // Convert the message to lower case
+  let messageContentLower = message.content.toLowerCase();
+
   // Check if the message is from the specific source channel
   if (message.channel.id === process.env.CHANNEL_ID4 && message.author.id === process.env.SOURCE_USER_ID) {
       // Check if the message contains "SPY" or "SPX"
@@ -62,6 +65,9 @@ for (const file of commandFiles) {
 client.on('ready', () => {
   console.log('Echo is online!');
 });
+
+// Listen for messages and pass them to the relayMessage function
+client.on('messageCreate', relayMessage);
 
 const configuration = new Configuration({
   apiKey: process.env.API_KEY,
