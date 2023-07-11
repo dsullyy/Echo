@@ -31,32 +31,53 @@ const client = new Client({
     ],
 });
 
-  async function relayMessage(message) {
-    // Convert the message to lower case
-    let messageContentLower = message.content.toLowerCase();
+async function relayMessage(message) {
+  if (message.channel.id === process.env.CHANNEL_ID3 && 
+      (message.author.id === process.env.SOURCE_USER_ID1 || 
+       message.author.id === process.env.SOURCE_USER_ID2 || 
+       message.author.id === process.env.SOURCE_USER_ID3)) {
 
-    // Check if the message is from the specific source channels
-    if (message.channel.id === process.env.CHANNEL_ID3 && (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2 || message.author.id === process.env.SOURCE_USER_ID3)) {
-      // rest of the code
-        // Check if the message contains "SPY" or "SPX"
-        if (messageContentLower.includes("spy") || messageContentLower.includes("spx")) {
-            try {
-                // Fetch the target channel to relay the message to
-                let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID1);
+      if (message.content.toLowerCase().includes("spy") || 
+          message.content.toLowerCase().includes("spx")) {
 
-                // If the channel exists, send the message to that channel
-                if (targetChannel) {
-                   console.log('Relaying message to target channel...');
-                    targetChannel.send(message.content);
-                } else {
-                   console.log('Target channel not found.');
-               }
-            } catch (error) {
-                console.log('An error occurred while fetching the target channel:', error);
-           }
-        }
-    }
+          try {
+              let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID1);
+
+              if (targetChannel) {
+                  // Create a new MessageOptions object to hold the content and any attachments
+                  let messageOptions = {
+                      content: message.content,
+                      files: [],
+                  };
+
+                  // If the message mentions everyone, add @everyone to the relayed message
+                  if (message.mentions.everyone) {
+                      messageOptions.content += " @everyone";
+                  }
+
+                  // If there are any attachments, add their URLs to the MessageOptions object
+                  if (message.attachments.size > 0) {
+                      message.attachments.each(attachment => {
+                          messageOptions.files.push(attachment.url);
+                      });
+                  }
+
+                  // Send the message with attachments to the target channel
+                  targetChannel.send(messageOptions);
+                  console.log('Message relayed successfully.');
+              } else {
+                  console.log('Target channel not found.');
+              }
+          } catch (error) {
+              console.log('An error occurred while fetching the target channel:', error);
+          }
+      } else {
+          console.log(`Message does not contain "SPY" or "SPX", skipping.`);
+      }
+  } else {
+      console.log(`Message is not in the right channel or not from the right user, skipping.`);
   }
+}
 
 client.commands = new Discord.Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
@@ -110,7 +131,7 @@ const limiter = new Bottleneck({
     }
 }
 
-     client.on('messageCreate', async (message) => { 
+    client.on('messageCreate', async (message) => {
       console.log(`Received message: ${message.content}`);
 
       if (message.author.bot) {
@@ -118,22 +139,21 @@ const limiter = new Bottleneck({
           return;
       }
   
-      if (!channelIDs.includes(message.channel.id)) {
-           console.log('Message is not in the specified channel, skipping...');
-          return;
-       }  
-
-      // Add this line to check if the message starts with 'Echo' 
-      if (!message.content.toLowerCase().startsWith('echo')) {
-          console.log('Message does not start with "Echo", skipping...');
-          return;
+      // For CHANNEL_ID2, only process messages starting with "Echo"
+      if (message.channel.id === process.env.CHANNEL_ID2) {
+         if (message.content.toLowerCase().startsWith('echo')) {
+             // Handle Echo's response in CHANNEL_ID2
+         } else {
+             console.log('Message does not start with "Echo", skipping...');
+         }
+      // For other specified channels, relay messages if they meet the criteria
+     } else if (channelIDs.includes(message.channel.id)) {
+         await relayMessage(message);
+     } else {
+          console.log('Message is not in the specified channel, skipping...');
       }
-
-      console.log(`Received message: ${message.content}`);
-
-     // Call the relayMessage function
-      await relayMessage(message);
-
+      if (!(message.channel.id === process.env.CHANNEL_ID3)) {
+      }
     try {
         await message.channel.sendTyping();
         let fetchedMessages = await message.channel.messages.fetch({ limit: 15 });
