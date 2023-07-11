@@ -9,7 +9,7 @@ const conversationLogs = new Map();
 const faqs = require('./faqs.json');
 const natural = require('natural');
 const axios = require('axios');
-const channelIDs = [process.env.CHANNEL_ID1, process.env.CHANNEL_ID2];
+const channelIDs = [process.env.CHANNEL_ID1, process.env.CHANNEL_ID2, process.env.CHANNEL_ID4];
 const botUsername = "Echo";
 const { getOriginalPrompt, getCustomPrompt } = require('./promptUtils');
 const commandsFile = './commands';
@@ -31,27 +31,31 @@ const client = new Client({
     ],
 });
 
-  function relayMessage(message) {
+  async function relayMessage(message) {
     // Convert the message to lower case
     let messageContentLower = message.content.toLowerCase();
-  
+
     // Check if the message is from the specific source channels
     if (message.channel.id === process.env.CHANNEL_ID4 && (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2)) {
         // Check if the message contains "SPY" or "SPX"
         if (messageContentLower.includes("spy") || messageContentLower.includes("spx")) {
-            // Get the target channel to relay the message to
-            let targetChannel = client.channels.cache.get(process.env.CHANNEL_ID3);
-  
-            // If the channel exists, send the message to that channel
-            if (targetChannel) {
-                console.log('Relaying message to target channel...');
-                targetChannel.send(message.content); // Change this line
-            } else {
-                console.log('Target channel not found.');
-            }
+            try {
+                // Fetch the target channel to relay the message to
+                let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID3);
+
+                // If the channel exists, send the message to that channel
+                if (targetChannel) {
+                   console.log('Relaying message to target channel...');
+                    targetChannel.send(message.content);
+                } else {
+                   console.log('Target channel not found.');
+               }
+            } catch (error) {
+                console.log('An error occurred while fetching the target channel:', error);
+           }
         }
     }
-  }  
+  }
 
 client.commands = new Discord.Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
@@ -64,9 +68,6 @@ for (const file of commandFiles) {
 client.on('ready', () => {
   console.log('Echo is online!');
 });
-
-// Listen for messages and pass them to the relayMessage function
-client.on('messageCreate', relayMessage);
 
 const configuration = new Configuration({
   apiKey: process.env.API_KEY,
@@ -119,18 +120,10 @@ client.on('messageCreate', async (message) => {
         console.log('Message is not in the specified channel, skipping...');
         return;
     }   
-
-    client.on('messageCreate', async (message) => {
-      // Check if the message is in the main channel
-      if (message.channel.id !== process.env.MAIN_CHANNEL_ID) {
-          console.log('Message is not in the main channel, skipping...');
-          return;
-      }
       console.log(`Received message: ${message.content}`);
-    });
 
      // Call the relayMessage function
-    relayMessage(message);
+  await relayMessage(message);
 
     try {
         await message.channel.sendTyping();
