@@ -36,7 +36,8 @@ const client = new Client({
     let messageContentLower = message.content.toLowerCase();
 
     // Check if the message is from the specific source channels
-    if (message.channel.id === process.env.CHANNEL_ID4 && (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2)) {
+    if (message.channel.id === process.env.CHANNEL_ID4 && (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2 || message.author.id === process.env.SOURCE_USER_ID3)) {
+      // rest of the code
         // Check if the message contains "SPY" or "SPX"
         if (messageContentLower.includes("spy") || messageContentLower.includes("spx")) {
             try {
