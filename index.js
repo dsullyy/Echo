@@ -9,7 +9,7 @@ const conversationLogs = new Map();
 const faqs = require('./faqs.json');
 const natural = require('natural');
 const axios = require('axios');
-const channelIDs = [process.env.CHANNEL_ID1, process.env.CHANNEL_ID2, process.env.CHANNEL_ID4];
+const channelIDs = [process.env.CHANNEL_ID1, process.env.CHANNEL_ID2, process.env.CHANNEL_ID3];
 const botUsername = "Echo";
 const { getOriginalPrompt, getCustomPrompt } = require('./promptUtils');
 const commandsFile = './commands';
@@ -36,13 +36,13 @@ const client = new Client({
     let messageContentLower = message.content.toLowerCase();
 
     // Check if the message is from the specific source channels
-    if (message.channel.id === process.env.CHANNEL_ID4 && (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2 || message.author.id === process.env.SOURCE_USER_ID3)) {
+    if (message.channel.id === process.env.CHANNEL_ID3 && (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2 || message.author.id === process.env.SOURCE_USER_ID3)) {
       // rest of the code
         // Check if the message contains "SPY" or "SPX"
         if (messageContentLower.includes("spy") || messageContentLower.includes("spx")) {
             try {
                 // Fetch the target channel to relay the message to
-                let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID3);
+                let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID1);
 
                 // If the channel exists, send the message to that channel
                 if (targetChannel) {
@@ -110,21 +110,29 @@ const limiter = new Bottleneck({
     }
 }
 
-client.on('messageCreate', async (message) => { 
-    console.log(`Received message: ${message.content}`);
+     client.on('messageCreate', async (message) => { 
+      console.log(`Received message: ${message.content}`);
 
-    if (message.author.bot) {
-        console.log('Message author is a bot, skipping...');
-        return;
-    }
-    if (!channelIDs.includes(message.channel.id)) {
-        console.log('Message is not in the specified channel, skipping...');
-        return;
-    }   
+      if (message.author.bot) {
+         console.log('Message author is a bot, skipping...');
+          return;
+      }
+  
+      if (!channelIDs.includes(message.channel.id)) {
+           console.log('Message is not in the specified channel, skipping...');
+          return;
+       }  
+
+      // Add this line to check if the message starts with 'Echo' 
+      if (!message.content.toLowerCase().startsWith('echo')) {
+          console.log('Message does not start with "Echo", skipping...');
+          return;
+      }
+
       console.log(`Received message: ${message.content}`);
 
      // Call the relayMessage function
-  await relayMessage(message);
+      await relayMessage(message);
 
     try {
         await message.channel.sendTyping();
@@ -161,12 +169,6 @@ client.on('messageCreate', async (message) => {
             messages: conversationLog,
             max_tokens: 800,
         });
-
-        // Add this line to check if the message starts with 'Echo' 
-        if (!message.content.toLowerCase().startsWith('echo')) {
-            console.log('Message does not start with "Echo", skipping...');
-            return;
-        }
 
         const assistantMessage = result.data.choices[0].message.content.trim();
         await sendSplitMessage(message, assistantMessage);
