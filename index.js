@@ -65,6 +65,12 @@ client.on('ready', () => {
   console.log('Echo is online!');
 });
 
+function relayMessage(message) {
+} 
+
+async function handleFaqCommand(message) {
+}
+
 // Listen for messages and pass them to the relayMessage function
 client.on('messageCreate', relayMessage);
 
@@ -120,8 +126,75 @@ client.on('messageCreate', async (message) => {
         return;
     }   
 
+    client.on('messageCreate', async (message) => {
+      // Check if the message is in the main channel
+      if (message.channel.id !== process.env.MAIN_CHANNEL_ID) {
+          console.log('Message is not in the main channel, skipping...');
+          return;
+      }
+      console.log(`Received message: ${message.content}`);
+    });
+
      // Call the relayMessage function
     relayMessage(message);
+
+    // Call the handleFaqCommand function
+    handleFaqCommand(message);
+
+    // Check if the message might be an FAQ
+    let similarityScores = faqs.map(faq => {
+      return { score: tfidfCosineSimilarity(message.content, faq.question), faq: faq };
+    });
+    similarityScores.sort((a, b) => b.score - a.score);
+
+    // If the most similar FAQ is similar enough, respond with the answer
+    if (similarityScores[0].score > CLEAR_FAQ_SIMILARITY_THRESHOLD) {
+  message.channel.send(similarityScores[0].faq.answer);
+    } else if (similarityScores[0].score > UNCLEAR_FAQ_SIMILARITY_THRESHOLD) {
+      // The local method found a potential match, but it's not clear
+      // Use the OpenAI API to get a more accurate similarity score
+      let apiSimilarityScore = await getOpenAISimilarityScore(message.content, similarityScores[0].faq.question);
+      if (apiSimilarityScore > CLEAR_FAQ_SIMILARITY_THRESHOLD) {
+       message.channel.send(similarityScores[0].faq.answer);
+     }
+    }
+
+    async function handleFaqCommand(message) {
+      // Check if the message is from an admin
+      if (!message.member.permissions.has('ADMINISTRATOR')) {
+        console.log('Message author is not an admin, skipping...');
+        return;
+      }
+    
+      // Check if the message starts with '/faq'
+      if (!message.content.toLowerCase().startsWith('/faq')) {
+        console.log('Message does not start with "/faq", skipping...');
+        return;
+      }
+    
+      // Extract the question and answer from the message
+      const faqText = message.content.slice('/faq'.length).trim();
+      const splitText = faqText.split('answer:');
+      if (splitText.length !== 2) {
+        console.log('Invalid FAQ format, skipping...');
+        await message.reply("Incorrect format. Please use 'Question: <question>. Answer: <answer>'");
+        return;
+      }
+    
+      const question = splitText[0].replace('Question:', '').trim();
+      const answer = splitText[1].trim();
+    
+      // Update the FAQs
+      faqs.push({ question, answer });
+      fs.writeFileSync('./faqs.json', JSON.stringify(faqs, null, 2));
+    
+      console.log('Added new FAQ:');
+      console.log(`Question: ${question}`);
+      console.log(`Answer: ${answer}`);
+    
+      // Reply to the user
+      await message.reply('Successfully added new FAQ');
+    }    
 
     try {
         await message.channel.sendTyping();
@@ -167,90 +240,7 @@ client.on('messageCreate', async (message) => {
 
         const assistantMessage = result.data.choices[0].message.content.trim();
         await sendSplitMessage(message, assistantMessage);
-
-
-        // If the message is a question or starts with 'echo', respond with an answer 
-        if (message.content.startsWith(`/faq`)) {
-            const userQuestion = message.content.slice(`$/faq`.length).trim();
-        
-            const userQuestionEmbedding = await createEmbedding(userQuestion);
-        
-            let bestMatch = { match: null, similarity: 0 };
-        
-            // Use cosine similarity to find the most similar FAQ question
-            for (let faq of faqs) {
-              const similarity = cosineSimilarity(userQuestionEmbedding, faq.embedding);
-              if (similarity > bestMatch.similarity) {
-                bestMatch = { match: faq, similarity: similarity };
-              }
-            }
-        
-            // Calculate similarity with TF-IDF
-            tfidf.tfidfs(userQuestion, function (i, measure) {
-              if (measure > bestMatch.similarity) {
-                bestMatch = { match: faqs[i], similarity: measure };
-              }
-            });
-        
-            // If the TF-IDF similarity is above a certain threshold, reply with the FAQ answer
-            const TFIDF_THRESHOLD = 0.3; // You will need to determine the appropriate threshold
-            if (bestMatch.similarity > TFIDF_THRESHOLD) {
-              await message.reply(bestMatch.match.answer);
-            } else {
-              for (let faq of faqs) {
-                const similarities = await Promise.all(
-                  faqs.map(async (faq) => {
-                    const faqQuestion = faq.question;
-        
-                    console.log(`User question: ${userQuestion}`);
-                    console.log(`Comparing with FAQ question: ${faqQuestion}`);
-        
-                    const result = await openai.createChatCompletion({
-                      model: 'gpt-3.5-turbo',
-                      messages: [
-                        {
-                          role: 'system',
-                          content: `You are a helpful assistant. Evaluate the similarity of these two questions on a scale from 0 to 3.`,
-                        },
-                        {
-                          role: 'user',
-                          content: `Question 1: ${userQuestion}`,
-                        },
-                        {
-                          role: 'assistant',
-                          content: `Question 2: ${faqQuestion}`,
-                        },
-                      ],
-                      temperature: 0.5,
-                      max_tokens: 800,
-                    });
-        
-                    console.log(result);
-                    console.log(
-                      `Completion response: ${JSON.stringify(
-                        result.data.choices[0]
-                      )}`
-                    );
-        
-                    const similarity = Number(
-                      result.data.choices[0].message.content.trim()
-                    );
-                    return { match: faq, similarity };
-                  })
-                );
-        
-                bestMatch = similarities.reduce(
-                  (prev, curr) =>
-                    curr.similarity > prev.similarity ? curr : prev,
-                  bestMatch
-                );
-        
-                if (bestMatch.match) {
-                  await message.reply(bestMatch.match.answer);
-                    }
-                }
-            }
-        }        
+     
     } catch (error) {
         console.error(`Error during API call: ${error}`);
         console.log('Conversation log built, starting chat completion...');
