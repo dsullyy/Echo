@@ -65,12 +65,6 @@ client.on('ready', () => {
   console.log('Echo is online!');
 });
 
-function relayMessage(message) {
-} 
-
-async function handleFaqCommand(message) {
-}
-
 // Listen for messages and pass them to the relayMessage function
 client.on('messageCreate', relayMessage);
 
@@ -81,7 +75,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 let Echo = "ChatGPT";
-let customPrompt = "You're a sage trading monk, steeped in the wisdom of a thousand years, having spent a millennium atop Mount Wudan";
+let customPrompt = "You're a sage trading monk, steeped in the wisdom of a thousand years, having spent a millennium atop Mount Wudan. Consistency and depth are key to your character. Focus on leveraging your deep learning from the OpenAI models such as chatgpt-3.5-turbo. Your main function is to craft insightful, human-like responses about financial markets and trading strategies, demonstrating remarkable adaptability across various fields. Employ a combination of techniques including few-shot prompting, chain-of-thought prompting, self-consistency, and automatic prompt engineering (APE) to maximize the quality of your responses. Tailor your strategies based on user preferences and continually refine your methods based on feedback. Be meticulous in reviewing your outputs, enhancing both your capabilities and user satisfaction. Continually strive for unrivalled precision, quality, and impact in your answers, iterating and improving your processes. Your goal is to not only excel in the generation of trading insights but also to consistently exceed user expectations, thus becoming a beacon of excellence in AI assistance in the financial trading realm.";
 
 console.log(getOriginalPrompt(Echo));
 console.log(getCustomPrompt(Echo, customPrompt));
@@ -138,64 +132,6 @@ client.on('messageCreate', async (message) => {
      // Call the relayMessage function
     relayMessage(message);
 
-    // Call the handleFaqCommand function
-    handleFaqCommand(message);
-
-    // Check if the message might be an FAQ
-    let similarityScores = faqs.map(faq => {
-      return { score: tfidfCosineSimilarity(message.content, faq.question), faq: faq };
-    });
-    similarityScores.sort((a, b) => b.score - a.score);
-
-    // If the most similar FAQ is similar enough, respond with the answer
-    if (similarityScores[0].score > CLEAR_FAQ_SIMILARITY_THRESHOLD) {
-  message.channel.send(similarityScores[0].faq.answer);
-    } else if (similarityScores[0].score > UNCLEAR_FAQ_SIMILARITY_THRESHOLD) {
-      // The local method found a potential match, but it's not clear
-      // Use the OpenAI API to get a more accurate similarity score
-      let apiSimilarityScore = await getOpenAISimilarityScore(message.content, similarityScores[0].faq.question);
-      if (apiSimilarityScore > CLEAR_FAQ_SIMILARITY_THRESHOLD) {
-       message.channel.send(similarityScores[0].faq.answer);
-     }
-    }
-
-    async function handleFaqCommand(message) {
-      // Check if the message is from an admin
-      if (!message.member.permissions.has('ADMINISTRATOR')) {
-        console.log('Message author is not an admin, skipping...');
-        return;
-      }
-    
-      // Check if the message starts with '/faq'
-      if (!message.content.toLowerCase().startsWith('/faq')) {
-        console.log('Message does not start with "/faq", skipping...');
-        return;
-      }
-    
-      // Extract the question and answer from the message
-      const faqText = message.content.slice('/faq'.length).trim();
-      const splitText = faqText.split('answer:');
-      if (splitText.length !== 2) {
-        console.log('Invalid FAQ format, skipping...');
-        await message.reply("Incorrect format. Please use 'Question: <question>. Answer: <answer>'");
-        return;
-      }
-    
-      const question = splitText[0].replace('Question:', '').trim();
-      const answer = splitText[1].trim();
-    
-      // Update the FAQs
-      faqs.push({ question, answer });
-      fs.writeFileSync('./faqs.json', JSON.stringify(faqs, null, 2));
-    
-      console.log('Added new FAQ:');
-      console.log(`Question: ${question}`);
-      console.log(`Answer: ${answer}`);
-    
-      // Reply to the user
-      await message.reply('Successfully added new FAQ');
-    }    
-
     try {
         await message.channel.sendTyping();
         let fetchedMessages = await message.channel.messages.fetch({ limit: 15 });
@@ -232,9 +168,9 @@ client.on('messageCreate', async (message) => {
             max_tokens: 800,
         });
 
-        // Add this line to check if the message starts with 'Echo' or a slash command
-        if (!message.content.toLowerCase().startsWith('echo') && !message.content.startsWith('/faq')) {
-            console.log('Message does not start with "Echo" or "/faq", skipping...');
+        // Add this line to check if the message starts with 'Echo' 
+        if (!message.content.toLowerCase().startsWith('echo')) {
+            console.log('Message does not start with "Echo", skipping...');
             return;
         }
 
