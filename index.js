@@ -44,16 +44,11 @@ async function relayMessage(message) {
               let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID1);
 
               if (targetChannel) {
-                  // Create a new MessageOptions object to hold the content and any attachments
-                  let messageOptions = {
-                      content: message.content,
-                      files: [],
-                  };
-
-                  // If the message mentions everyone, add @everyone to the relayed message
-                  if (message.mentions.everyone) {
-                      messageOptions.content += " @everyone";
-                  }
+                // Create a new MessageOptions object to hold the content and any attachments
+                let messageOptions = {
+                    content: "@everyone " + message.content, // Add @everyone at the start of the message
+                    files: [],
+                };
 
                   // If there are any attachments, add their URLs to the MessageOptions object
                   if (message.attachments.size > 0) {
@@ -146,14 +141,17 @@ const limiter = new Bottleneck({
          } else {
              console.log('Message does not start with "Echo", skipping...');
          }
-      // For other specified channels, relay messages if they meet the criteria
-     } else if (channelIDs.includes(message.channel.id)) {
-         await relayMessage(message);
-     } else {
-          console.log('Message is not in the specified channel, skipping...');
-      }
-      if (!(message.channel.id === process.env.CHANNEL_ID3)) {
-      }
+          // For other specified channels, relay messages if they meet the criteria
+        } else if (channelIDs.includes(message.channel.id)) {
+            await relayMessage(message);
+            if (message.channel.id === process.env.CHANNEL_ID3) {
+              // If the message is in CHANNEL_ID3, do not attempt to respond
+              return;
+            }
+        } else {
+            console.log('Message is not in the specified channel, skipping...');
+        }
+
     try {
         await message.channel.sendTyping();
         let fetchedMessages = await message.channel.messages.fetch({ limit: 15 });
