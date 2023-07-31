@@ -31,33 +31,6 @@ const client = new Client({
     ],
 });
 
-async function getEarningsData(ticker) {
-    // Validate ticker
-    if (!ticker || typeof ticker !== 'string') {
-        throw new Error('Invalid ticker symbol');
-    }
-
-    try {
-        const response = await axios.get(`https://api.twelvedata.com/earnings?symbol=${ticker}&apikey=process.env.ER_API_KEY`);
-        const data = response.data;
-
-        console.log(data); 
-
-        const nextEarnings = data.find(entry => new Date(entry.date) > new Date());
-        if (nextEarnings) {
-            return {
-                date: nextEarnings.date,
-                epsEstimate: nextEarnings.epsEstimate,
-            };
-        } else {
-            return null;
-        }
-    } catch (error) {
-        console.error(`Error getting earnings data for ${ticker}: ${error}`);
-        throw error;
-    }
-}
-
 async function relayMessage(message) {
     if (message.channel.id === process.env.CHANNEL_ID3) {
         // Relay all messages from CHANNEL_ID3 to CHANNEL_ID4
@@ -93,9 +66,9 @@ async function relayMessage(message) {
             message.author.id === process.env.SOURCE_USER_ID3) &&
             (message.content.toLowerCase().includes("spy") || 
             message.content.toLowerCase().includes("spx"))) {
-            // Relay certain users' messages from CHANNEL_ID3 to CHANNEL_ID2 if they contain "spy" or "spx"
+            // Relay certain users' messages from CHANNEL_ID3 to CHANNEL_ID1 if they contain "spy" or "spx"
             try {
-                let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID2);
+                let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID1);
 
                 if (targetChannel) {
                     // Create a new MessageOptions object to hold the content and any attachments
@@ -195,30 +168,6 @@ client.on('messageCreate', async (message) => {
         }
     } else {
         console.log('Message is not in the specified channel, skipping...');
-    }
-
-    // Process '.er' command
-    if (message.content.startsWith('.er ')) {
-        const ticker = message.content.split(' ')[1];
-        getEarningsData(ticker)
-            .then(earningsData => {
-                if (earningsData) {
-                    message.reply(`Next earnings for ${ticker} is on ${earningsData.date} with EPS estimate ${earningsData.epsEstimate}.`);
-                } else {
-                    message.reply(`No upcoming earnings data available for ${ticker}.`);
-                }
-            })
-            .catch(err => {
-                if (err.message === 'Invalid ticker symbol') {
-                    message.reply('Please provide a valid ticker symbol.');
-                } else {
-                    message.reply('There was an error getting the earnings data. Please try again later.');
-                }
-                console.error(`Error getting earnings data for ${ticker}: ${err}`);
-            });
-
-        // Stop further processing of this message
-        return;
     }
 
     // Only process messages that include 'echo'
