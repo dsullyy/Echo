@@ -15,6 +15,34 @@ const { getOriginalPrompt, getCustomPrompt } = require('./promptUtils');
 const commandsFile = './commands';
 const pinecone = require("@pinecone-database/pinecone");
 const vector = pinecone.vector;
+const getSimilarMessages = require('./getSimilarMessages');
+const retrieveTickerInfo = require('./retrieveTickerInfo');
+const createEmbeddingForMessage = require('./createEmbedding');
+const { MongoClient } = require('mongodb');
+const mongoClient = new MongoClient(process.env.MONGODB_URI, { 
+    useNewUrlParser: true, 
+    useUnifiedTopology: true,
+    writeConcern: {
+        w: 'majority', 
+        j: true
+    }
+});
+const db = mongoClient.db('AevitasDB');
+
+const fastcsv = require('fast-csv');
+
+let tickerSymbols = [];
+fs.createReadStream('companylist.csv')
+    .pipe(fastcsv.parse({ headers: true, skipRows: 0 }))
+    .on('data', (record) => {
+        tickerSymbols.push(record.Symbol);
+    })
+    .on('end', () => {
+        console.log(`Loaded ${tickerSymbols.length} ticker symbols.`);
+    })
+    .on('error', (err) => {
+        console.error('Error reading ticker symbols from CSV file:', err);
+    });
 
 let TfIdf = natural.TfIdf;
 let tfidf = new TfIdf();
@@ -23,6 +51,13 @@ for (let faq of faqs) {
     tfidf.addDocument(faq.question);
 }
 
+async function startBot() {
+    try {
+        await mongoClient.connect();
+    } catch (e) {
+        console.error(e);
+        process.exit(1);
+    }
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -151,12 +186,104 @@ const limiter = new Bottleneck({
     }
 }
 
+// Buffer to store recent admin messages
+let adminMessageBuffer = [];
+
 client.on('messageCreate', async (message) => {
     console.log(`Received message: ${message.content}`);
+    console.log('Connected to MongoDB');
 
     if (message.author.bot) {
         console.log('Message author is a bot, skipping...');
         return;
+    }
+
+    // Extract words from the message
+    const wordRegex = /\b[A-Za-z]{2,}\b/g;
+    let words = message.content.match(wordRegex);
+
+    // Check if the message is from an admin
+    if (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2) {
+        // If a word is found
+        if (words) {
+            // Find the first word that is a ticker symbol
+            const ticker = words.find(word => tickerSymbols.includes(word.toUpperCase()));
+            if (ticker) {
+                // Store the buffer of messages into the database
+                for (let bufferedMessage of adminMessageBuffer) {
+                    let embedding = await createEmbeddingForMessage(bufferedMessage.content);
+                    let doc = {
+                        ticker: bufferedMessage.ticker,
+                        message: bufferedMessage.content,
+                        timestamp: bufferedMessage.createdTimestamp,
+                        embedding: embedding
+                    };
+                    await db.collection('LuckeeePositions').insertOne(doc);
+                }
+
+                // Clear the buffer
+                adminMessageBuffer = [];
+
+                // Process the current message
+                let embedding = await createEmbeddingForMessage(message.content);
+                let doc = {
+                    ticker: ticker.toUpperCase(), // Use the found ticker
+                    message: message.content,
+                    timestamp: message.createdTimestamp,
+                    embedding: embedding
+                };
+                await db.collection('LuckeeePositions').insertOne(doc);
+    
+                // Add the current message to the buffer
+                adminMessageBuffer.push({
+                    ticker: ticker.toUpperCase(),
+                    content: message.content,
+                    createdTimestamp: message.createdTimestamp
+                });
+            } else {
+                // Add the message to the buffer
+                adminMessageBuffer.push({
+                    ticker: null,
+                    content: message.content,
+                    createdTimestamp: message.createdTimestamp
+                });
+            }
+        }
+    }
+
+    // If the user's message is a command to get a ticker summary
+    if (message.content.startsWith('/')) {
+        const ticker = message.content.slice(1).toUpperCase();  // Extract the ticker from the command
+        const messageEmbedding = await createEmbeddingForMessage(message.content);
+        const similarMessages = await getSimilarMessages(messageEmbedding, ticker, mongoClient);
+        let contentToSummarize = similarMessages.map(message => message.content).join(' ');
+
+        let messagesToSummarize = similarMessages
+            .filter(message => message && message.content)  // Filter out null messages or messages without content
+            .map(message => ({ role: 'user', content: message.content }));
+
+
+        let systemMessage = {
+            role: 'system',
+            content: 'You are an AI financial analyst. Your job is to distill key insights from the provided messages. Specifically, focus on extracting any explicit or implied analysis of the stock, any mentioned price targets, and whether any positions in the stock are being opened or closed.'
+        };
+
+        let promptMessages = [systemMessage, ...messagesToSummarize];
+
+        let prompt = "You are an AI financial analyst. Your job is to distill key insights from the provided messages. Specifically, focus on extracting any explicit or implied analysis of the stock, any mentioned price targets, and whether any positions in the stock are being opened or closed.: " + similarMessages.map(message => message.message).join("\n");
+        let response = await openai.createChatCompletion({
+         model: 'gpt-3.5-turbo',
+         messages: promptMessages,
+         max_tokens: 800,
+        });
+
+        if (response && response.data && response.data.choices && response.data.choices.length > 0 && response.data.choices[0].message) {
+            let summary = response.data.choices[0].message.content;
+            // Respond with the summary
+            await message.reply(`Summary for ${ticker}:\n${summary}`);
+        } else {
+            console.error("Unexpected response format:", response);
+        }        
     }
 
     // Relay messages if they meet the criteria
@@ -250,3 +377,6 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.BOT_TOKEN)
+}
+
+startBot();
