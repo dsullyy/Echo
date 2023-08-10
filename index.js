@@ -9,7 +9,7 @@ const conversationLogs = new Map();
 const faqs = require('./faqs.json');
 const natural = require('natural');
 const axios = require('axios');
-const channelIDs = [process.env.CHANNEL_ID1, process.env.CHANNEL_ID2, process.env.CHANNEL_ID3];
+const channelIDs = [process.env.CHANNEL_ID1, process.env.CHANNEL_ID2, process.env.CHANNEL_ID3, process.env.CHANNEL_ID4, process.env.CHANNEL_ID5];
 const botUsername = "Echo";
 const { getOriginalPrompt, getCustomPrompt } = require('./promptUtils');
 const commandsFile = './commands';
@@ -71,63 +71,46 @@ async function relayMessage(message) {
         // Relay all messages from CHANNEL_ID3 to CHANNEL_ID4
         try {
             let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID4);
+            let prefixMessage = "@everyone ";  // default prefix
 
+            // Create a new MessageOptions object to hold the content and any attachments
+            let messageOptions = {
+                content: "",
+                files: []
+            };
+
+            // If there are any attachments, add their URLs to the MessageOptions object
+            if (message.attachments.size > 0) {
+                message.attachments.each(attachment => {
+                    messageOptions.files.push(attachment.url);
+                });
+            }
+
+            if (message.author.id === process.env.SOURCE_USER_ID1 || message.author.id === process.env.SOURCE_USER_ID2) {
+                // If Esther is the author
+                let estherChannel = await client.channels.fetch(process.env.CHANNEL_ID1);
+                prefixMessage += "Esther's Trade Idea: ";
+                messageOptions.content = prefixMessage + message.content;
+                estherChannel.send(messageOptions);  // Relay to Esther's channel
+            } else if (message.author.id === process.env.SOURCE_USER_ID3) {
+                // If Michael is the author
+                let michaelChannel = await client.channels.fetch(process.env.CHANNEL_ID5);
+                prefixMessage += "Michael's Trade Idea: ";
+                messageOptions.content = prefixMessage + message.content;
+                michaelChannel.send(messageOptions);  // Relay to Michael's channel
+            }
+
+            // Sending to CHANNEL_ID4
+            messageOptions.content = prefixMessage + message.content;
             if (targetChannel) {
-                // Create a new MessageOptions object to hold the content and any attachments
-                let messageOptions = {
-                    content: "@everyone " + message.content, // Add @everyone at the start of the message
-                    files: [],
-                };
-
-                // If there are any attachments, add their URLs to the MessageOptions object
-                if (message.attachments.size > 0) {
-                    message.attachments.each(attachment => {
-                        messageOptions.files.push(attachment.url);
-                    });
-                }
-
-                // Send the message with attachments to the target channel
                 targetChannel.send(messageOptions);
                 console.log('Message relayed successfully.');
             } else {
                 console.log('Target channel not found.');
             }
+
         } catch (error) {
             console.log('An error occurred while fetching the target channel:', error);
-        }
-        
-        if ((message.author.id === process.env.SOURCE_USER_ID1 || 
-            message.author.id === process.env.SOURCE_USER_ID2 || 
-            message.author.id === process.env.SOURCE_USER_ID3) &&
-            (message.content.toLowerCase().includes("spy") || 
-            message.content.toLowerCase().includes("spx"))) {
-            // Relay certain users' messages from CHANNEL_ID3 to CHANNEL_ID1 if they contain "spy" or "spx"
-            try {
-                let targetChannel = await client.channels.fetch(process.env.CHANNEL_ID1);
-
-                if (targetChannel) {
-                    // Create a new MessageOptions object to hold the content and any attachments
-                    let messageOptions = {
-                        content: "@everyone " + message.content, // Add @everyone at the start of the message
-                        files: [],
-                    };
-
-                    // If there are any attachments, add their URLs to the MessageOptions object
-                    if (message.attachments.size > 0) {
-                        message.attachments.each(attachment => {
-                            messageOptions.files.push(attachment.url);
-                        });
-                    }
-
-                    // Send the message with attachments to the target channel
-                    targetChannel.send(messageOptions);
-                    console.log('Message relayed successfully.');
-                } else {
-                    console.log('Target channel not found.');
-                }
-            } catch (error) {
-                console.log('An error occurred while fetching the target channel:', error);
-            }
         }
     } else {
         console.log(`Message is not in the right channel or not from the right user, skipping.`);
