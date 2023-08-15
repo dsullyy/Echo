@@ -11,12 +11,12 @@ module.exports = {
     env: {
       NODE_ENV: 'development',
       MONGODB_URI: process.env.MONGODB_URI,
-      SOURCE_USER_ID3: '892445273278775366' // Add this line
+      SOURCE_USER_ID3: '501724678537084928' // Add this line
     },
     env_production: {
       NODE_ENV: 'production',
       MONGODB_URI: process.env.MONGODB_URI,
-      SOURCE_USER_ID3: '892445273278775366' // Add this line
+      SOURCE_USER_ID3: '501724678537084928' // Add this line
     }    
   }],
 };
