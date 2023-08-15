@@ -67,6 +67,9 @@ const client = new Client({
 });
 
 async function relayMessage(message) {
+    console.log("Message author ID:", message.author.id); // Log the author ID
+    console.log("SOURCE_USER_ID3:", process.env.SOURCE_USER_ID3); // Log the environment variable
+    console.log("CHANNEL_ID5:", process.env.CHANNEL_ID5); // Log the environment variable
     if (message.channel.id === process.env.CHANNEL_ID3) {
         // Relay all messages from CHANNEL_ID3 to CHANNEL_ID4
         try {
@@ -93,6 +96,7 @@ async function relayMessage(message) {
                 messageOptions.content = prefixMessage + message.content;
                 estherChannel.send(messageOptions);  // Relay to Esther's channel
             } else if (message.author.id === process.env.SOURCE_USER_ID3) {
+                console.log("Michael's condition met"); // Log if condition is met
                 // If Michael is the author
                 let michaelChannel = await client.channels.fetch(process.env.CHANNEL_ID5);
                 prefixMessage += "Michael's Trade Idea: ";
@@ -106,6 +110,7 @@ async function relayMessage(message) {
                 targetChannel.send(messageOptions);
                 console.log('Message relayed successfully.');
             } else {
+                console.log("Michael's condition not met"); // Log if condition is not met
                 console.log('Target channel not found.');
             }
 
