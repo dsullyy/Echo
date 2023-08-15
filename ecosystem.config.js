@@ -1,5 +1,3 @@
-require('dotenv').config();
-
 module.exports = {
   apps : [{
     name: 'my-app',
@@ -12,11 +10,13 @@ module.exports = {
     max_memory_restart: '1G',
     env: {
       NODE_ENV: 'development',
-      MONGODB_URI: process.env.MONGODB_URI
+      MONGODB_URI: process.env.MONGODB_URI,
+      SOURCE_USER_ID3: '892445273278775366' // Add this line
     },
     env_production: {
       NODE_ENV: 'production',
-      MONGODB_URI: process.env.MONGODB_URI
-    }
+      MONGODB_URI: process.env.MONGODB_URI,
+      SOURCE_USER_ID3: '892445273278775366' // Add this line
+    }    
   }],
 };
